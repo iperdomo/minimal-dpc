@@ -1,0 +1,53 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'me.perdomo.dpc'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "me.perdomo.dpc"
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildFeatures {
+        // Policy consults BuildConfig.DEBUG to decide whether to apply the
+        // restrictions in Policy.DEBUG_SKIPPED_RESTRICTIONS. AGP 8 does not
+        // generate BuildConfig unless asked.
+        buildConfig true
+    }
+
+    buildTypes {
+        debug {
+            // Exists so there is a build you can keep adb attached to. It is
+            // the same applicationId and the same AdminReceiver, so every dpm
+            // command in the README works unchanged - the only difference is
+            // that DISALLOW_DEBUGGING_FEATURES is not applied.
+            //
+            // Never hand this build to anyone: it leaves adb reachable, which
+            // is a shell with device-owner-adjacent reach on a locked device.
+            minifyEnabled false
+        }
+
+        release {
+            // Signed with the debug key by default so `gradlew assembleRelease` just works.
+            // For a device you actually hand to someone, create a real keystore and
+            // point signingConfigs at it - the provisioning QR pins this certificate.
+            signingConfig signingConfigs.debug
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    // Intentionally none. Everything used here is in the Android framework.
+}

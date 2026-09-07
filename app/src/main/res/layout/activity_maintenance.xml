@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:id="@+id/status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:textSize="13sp"
+            android:paddingBottom="20dp" />
+
+        <!-- Locked view -->
+        <LinearLayout
+            android:id="@+id/lockedPanel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <EditText
+                android:id="@+id/passcode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Passcode"
+                android:importantForAutofill="no"
+                android:inputType="textPassword" />
+
+            <Button
+                android:id="@+id/unlock"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Unlock" />
+        </LinearLayout>
+
+        <!-- Unlocked view -->
+        <LinearLayout
+            android:id="@+id/adminPanel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="4dp"
+                android:textStyle="bold"
+                android:text="VPN" />
+
+            <Switch
+                android:id="@+id/vpnAlwaysOn"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp"
+                android:text="Always-on VPN" />
+
+            <Switch
+                android:id="@+id/vpnLockdown"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp"
+                android:text="Block non-VPN traffic (lockdown)" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="16dp"
+                android:textSize="12sp"
+                android:text="Both take effect immediately and survive reboots. Lockdown drops every packet outside the tunnel, so a broken VPN profile means no network at all - this screen stays reachable either way. Lockdown needs always-on and is ignored without it." />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginBottom="16dp"
+                android:background="#40808080" />
+
+            <!-- Approved apps -->
+            <TextView
+                android:id="@+id/approvedHeader"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="4dp"
+                android:textStyle="bold"
+                android:text="Approved apps" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="8dp"
+                android:textSize="12sp"
+                android:text="Non-system apps allowed on the device. Everything else installed from Play is hidden and uninstalled within seconds. Removing an app from this list uninstalls it. Pre-installed system apps are not covered here - use Hidden apps below." />
+
+            <!-- Input above the list: with a long list a field underneath it
+                 would sit several screens down. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingBottom="8dp">
+
+                <EditText
+                    android:id="@+id/newPackage"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="org.mozilla.firefox"
+                    android:importantForAutofill="no"
+                    android:inputType="textNoSuggestions"
+                    android:maxLines="1"
+                    android:textSize="14sp" />
+
+                <Button
+                    android:id="@+id/addPackage"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Add" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/approvedList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="16dp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginBottom="16dp"
+                android:background="#40808080" />
+
+            <!-- Hidden apps -->
+            <TextView
+                android:id="@+id/hiddenHeader"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="4dp"
+                android:textStyle="bold"
+                android:text="Hidden apps" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="8dp"
+                android:textSize="12sp"
+                android:text="Pre-installed apps to take off the device: the icon disappears and they cannot be launched. The APK stays on its read-only partition, so this is hiding, not uninstalling. Play Services, Settings, the home app, keyboards, the VPN client and this app are refused." />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingBottom="8dp">
+
+                <EditText
+                    android:id="@+id/newHidden"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="com.google.android.youtube"
+                    android:importantForAutofill="no"
+                    android:inputType="textNoSuggestions"
+                    android:maxLines="1"
+                    android:textSize="14sp" />
+
+                <Button
+                    android:id="@+id/addHidden"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Add" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/hiddenList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="16dp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginBottom="16dp"
+                android:background="#40808080" />
+
+            <Button
+                android:id="@+id/applyLockdown"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Apply lockdown" />
+
+            <Button
+                android:id="@+id/maintenanceMode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Suspend lockdown for 30 min (install apps)" />
+
+            <Button
+                android:id="@+id/refresh"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Refresh status" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="16dp"
+                android:background="#40808080" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="8dp"
+                android:textSize="12sp"
+                android:text="Escape hatch. Releases Device Owner and clears every policy set by this app, including always-on VPN and both lists. The only way back is a factory reset." />
+
+            <Button
+                android:id="@+id/releaseOwnership"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Release device ownership" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

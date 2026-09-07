@@ -1,0 +1,26 @@
+# Gradle
+.gradle/
+build/
+local.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Signing material - never commit these
+*.jks
+*.keystore
+keystore.properties
+
+# Provisioning artefacts produced by tools/make-qr.py
+qr.png
+
+# Python
+__pycache__/
+*.py[cod]
+
+# OS
+.DS_Store
