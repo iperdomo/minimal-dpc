@@ -2,6 +2,15 @@ plugins {
     id 'com.android.application'
 }
 
+// Release signing material lives in keystore.properties (gitignored) so the
+// passwords never enter git. Absent it, assembleRelease falls back to the
+// debug key - fine for a local smoke test, never for a device you hand over.
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
 android {
     namespace 'me.perdomo.dpc'
     compileSdk 35
@@ -21,6 +30,17 @@ android {
         buildConfig true
     }
 
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            release {
+                storeFile rootProject.file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
+
     buildTypes {
         debug {
             // Exists so there is a build you can keep adb attached to. It is
@@ -34,10 +54,11 @@ android {
         }
 
         release {
-            // Signed with the debug key by default so `gradlew assembleRelease` just works.
-            // For a device you actually hand to someone, create a real keystore and
-            // point signingConfigs at it - the provisioning QR pins this certificate.
-            signingConfig signingConfigs.debug
+            // The provisioning QR pins this certificate, so changing the key later
+            // invalidates every QR code already in circulation.
+            signingConfig keystorePropertiesFile.exists()
+                    ? signingConfigs.release
+                    : signingConfigs.debug
             minifyEnabled false
         }
     }

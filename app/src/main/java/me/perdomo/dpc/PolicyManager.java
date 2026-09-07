@@ -252,12 +252,16 @@ public final class PolicyManager {
         DevicePolicyManager dpm = dpm(ctx);
         ComponentName admin = admin(ctx);
         for (String r : Policy.USER_RESTRICTIONS) {
-            // A debug build clears its skipped restrictions rather than just
-            // declining to add them, so that installing a debug APK over a
-            // release one hands adb back instead of leaving it severed.
-            boolean apply = add && !skippedInDebug(r);
-            if (add && !apply) {
+            // Both skips clear the restriction rather than just declining to
+            // add it. For the debug case that is what lets a debug APK
+            // installed over a release one hand adb back instead of leaving it
+            // severed; for the VPN case it is what lets an operator turn
+            // always-on back off and reconfigure a broken tunnel.
+            boolean apply = add && !skippedInDebug(r) && !deferredUntilVpn(ctx, r);
+            if (add && skippedInDebug(r)) {
                 Log.w(TAG, "DEBUG BUILD - clearing " + r + " instead of applying it");
+            } else if (add && !apply) {
+                Log.i(TAG, "Deferring " + r + " until always-on VPN is enabled");
             }
             try {
                 if (apply) {
@@ -282,6 +286,19 @@ public final class PolicyManager {
     static boolean skippedInDebug(String restriction) {
         return BuildConfig.DEBUG
                 && Policy.DEBUG_SKIPPED_RESTRICTIONS.contains(restriction);
+    }
+
+    /**
+     * True while a restriction is held back pending VPN setup.
+     *
+     * <p>See {@link Policy#VPN_DEPENDENT_RESTRICTIONS}. The gate is the
+     * always-on switch rather than "is the VPN package installed", because
+     * installing WireGuard is not the same as having imported a working
+     * tunnel - and it is the tunnel that has to survive lockdown.</p>
+     */
+    static boolean deferredUntilVpn(Context ctx, String restriction) {
+        return Policy.VPN_DEPENDENT_RESTRICTIONS.contains(restriction)
+                && !isVpnAlwaysOnEnabled(ctx);
     }
 
     // ------------------------------------------------------------------
@@ -841,9 +858,16 @@ public final class PolicyManager {
 
         int restrictionsSet = 0;
         int restrictionsExpected = 0;
+        int skippedDebug = 0;
+        int deferredVpn = 0;
         android.os.UserManager um = ctx.getSystemService(android.os.UserManager.class);
         for (String r : Policy.USER_RESTRICTIONS) {
             if (skippedInDebug(r)) {
+                skippedDebug++;
+                continue;
+            }
+            if (deferredUntilVpn(ctx, r)) {
+                deferredVpn++;
                 continue;
             }
             restrictionsExpected++;
@@ -853,11 +877,15 @@ public final class PolicyManager {
         }
         sb.append("Restrictions   : ").append(restrictionsSet)
           .append(" / ").append(restrictionsExpected);
-        int skipped = Policy.USER_RESTRICTIONS.length - restrictionsExpected;
-        if (skipped > 0) {
-            // Counted out of what this build intends to apply, not out of the
-            // full list - otherwise a debug build reads as a failed release one.
-            sb.append("   (").append(skipped).append(" skipped: debug build)");
+        // Counted out of what this build intends to apply right now, not out of
+        // the full list - otherwise a debug build, or a device still waiting on
+        // VPN setup, reads as a failed release one.
+        if (skippedDebug > 0) {
+            sb.append("   (").append(skippedDebug).append(" skipped: debug build)");
+        }
+        if (deferredVpn > 0) {
+            sb.append("   (").append(deferredVpn)
+              .append(" deferred: enable always-on VPN)");
         }
         sb.append('\n');
 

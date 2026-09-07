@@ -34,6 +34,27 @@
             </intent-filter>
         </activity>
 
+        <!--
+          Required by ManagedProvisioning on Android 11+. Without these two
+          filters, QR provisioning fails with "Can't set up device" after the
+          APK is already installed. See ProvisioningActivity.
+        -->
+        <activity
+            android:name=".ProvisioningActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.app.action.GET_PROVISIONING_MODE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.app.action.ADMIN_POLICY_COMPLIANCE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <receiver
             android:name=".AdminReceiver"
             android:exported="true"

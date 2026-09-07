@@ -114,7 +114,22 @@ Use ASCII characters. Java and Python agree on UTF-8 for PBKDF2, but there is no
 ./gradlew assembleRelease
 ```
 
-The release build is signed with the debug key so this works out of the box. For a device you hand to someone, create a real keystore and point `signingConfigs` at it — the provisioning QR pins this certificate, so changing it later invalidates existing QR codes.
+The release build is signed with the key described by `keystore.properties` at the repo root. Without that file the build falls back to the debug key, so a fresh clone still assembles. Create the real key once:
+
+```bash
+keytool -genkeypair -alias release -keyalg RSA -keysize 4096 -validity 10000 \
+        -keystore release.jks -storetype PKCS12 \
+        -dname "CN=minimal-dpc release, O=example.com"
+
+cat > keystore.properties <<'EOF'
+storeFile=release.jks
+storePassword=...
+keyAlias=release
+keyPassword=...
+EOF
+```
+
+Both files are gitignored. Back them up somewhere you will still have in ten years: the provisioning QR pins this certificate, so losing the key means every QR code already in circulation stops working and every provisioned device needs a factory reset to move to a new one. The long `-validity` is for the same reason.
 
 There is also `./gradlew assembleDebug`, which exists only so that there is a build you can keep adb attached to. See *Testing on an emulator* below. Never deploy it.
 
@@ -145,6 +160,8 @@ python3 tools/make-qr.py \
 
 Factory reset the device, then tap the first setup screen six times to open the QR scanner and scan it. The APK must be reachable over HTTPS from the device.
 
+On Android 11+ the platform runs a short handshake with the DPC during this flow, and refuses to finish without it: `ProvisioningActivity` answers `GET_PROVISIONING_MODE` and `ADMIN_POLICY_COMPLIANCE`. Remove those intent filters and provisioning fails with a bare "Can't set up device - Contact your IT admin for help", *after* the APK has downloaded and installed, saying nothing about what is missing. `adb shell dpm set-device-owner` skips the handshake entirely, so the adb path keeps working and hides the problem.
+
 ### 5. Add the Google account and configure the approved apps
 
 Order matters here. Provisioning required a device with no accounts, so sign in to Google now if you want the Play Store to work. The VPN client must be installed *before* always-on VPN can be set, and you want its tunnel working before you enable lockdown.
@@ -156,9 +173,19 @@ adb install -r <each approved app>.apk
 
 Open the VPN client, import its configuration, and confirm the tunnel connects. This is a one-time manual step — with no server there is nothing to push a profile from.
 
+Do not skip the "confirm it connects" part. The next step arms a switch that drops every packet outside the tunnel; if the tunnel does not come up, the device has no network at all.
+
 ### 6. Lock it down
 
-Open **Device Lockdown** on the device, enter your passcode, press **Apply lockdown**. The status panel should then read:
+Open **Device Lockdown** on the device, enter your passcode, then:
+
+1. Turn on **always-on VPN**, and confirm the tunnel is still up.
+2. Turn on **block non-VPN traffic**.
+3. Press **Apply lockdown**.
+
+Both VPN switches start off (`Policy.VPN_ALWAYS_ON_DEFAULT`, `Policy.VPN_LOCKDOWN_DEFAULT`), because provisioning always happens before the VPN client exists — arming them earlier would strand the device without the network it needs to finish setup. This app is exempt from lockdown, so the maintenance screen remains reachable if the tunnel breaks.
+
+The status panel should then read:
 
 ```
 Device owner   : yes

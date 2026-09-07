@@ -40,8 +40,15 @@ public final class Policy {
      * and it is stored on the device, so it survives reboots, the periodic
      * sweep and {@code adb install -r}. Read the live value with
      * {@link PolicyManager#isVpnAlwaysOnEnabled(android.content.Context)}.</p>
+     *
+     * <p>Off, because provisioning necessarily happens before
+     * {@link #VPN_PACKAGE} is installed and long before it has a working
+     * tunnel. Pinning always-on at that point either fails outright or, worse,
+     * succeeds the moment the VPN app appears and forces up a tunnel that has
+     * no configuration. Install the VPN client, import its profile, confirm it
+     * connects, then turn this on from the maintenance screen.</p>
      */
-    public static final boolean VPN_ALWAYS_ON_DEFAULT = true;
+    public static final boolean VPN_ALWAYS_ON_DEFAULT = false;
 
     /**
      * Initial state of the "block non-VPN traffic" switch.
@@ -54,8 +61,16 @@ public final class Policy {
      * <p>Lockdown is meaningless without always-on, so the effective value is
      * always {@code alwaysOn && lockdown}. Turning always-on off does not
      * forget this setting - it comes back when always-on returns.</p>
+     *
+     * <p>Off for the same reason as {@link #VPN_ALWAYS_ON_DEFAULT}, and more
+     * urgently: this switch drops every packet outside the tunnel. Enabled on a
+     * device whose tunnel is not yet configured, it takes the network away
+     * before you have finished setting the device up - including the network
+     * you needed to install the VPN profile in the first place. This app is
+     * exempt from lockdown, so the maintenance screen still lets you back out,
+     * but nothing else on the device will work until you do.</p>
      */
-    public static final boolean VPN_LOCKDOWN_DEFAULT = true;
+    public static final boolean VPN_LOCKDOWN_DEFAULT = false;
 
     /**
      * Packages allowed to bypass lockdown when the tunnel is down (Android 10+).
@@ -93,7 +108,7 @@ public final class Policy {
      */
     public static final Set<String> APPROVED_PACKAGES = setOf(
             "com.wireguard.android",
-            "com.android.chrome"
+            "org.mozilla.firefox"
     );
 
     /**
@@ -105,7 +120,7 @@ public final class Policy {
      * from removing unapproved software.</p>
      */
     public static final Set<String> UNINSTALL_BLOCKED = setOf(
-            // "com.android.chrome"
+            "com.wireguard.android"
     );
 
     /**
@@ -175,6 +190,26 @@ public final class Policy {
     };
 
     /**
+     * Restrictions from {@link #USER_RESTRICTIONS} that stay unset until
+     * always-on VPN has been armed from the maintenance screen.
+     *
+     * <p>DISALLOW_CONFIG_VPN blocks the system VPN consent dialog, which is
+     * exactly what importing a WireGuard tunnel needs. Applied at provisioning
+     * time - before {@link #VPN_PACKAGE} is even installed - it makes step 5 of
+     * the README unreachable: you cannot configure the VPN the policy exists to
+     * enforce. It is deferred until {@code VPN_ALWAYS_ON} is on, which is the
+     * operator's signal that the tunnel is configured and working.</p>
+     *
+     * <p>Deferred, not dropped. Once always-on is enabled the restriction goes
+     * on and stays on, so a locked-down device is no weaker than before - the
+     * window where a user could reconfigure the VPN is the setup window, when
+     * they are holding an unprovisioned device anyway.</p>
+     */
+    public static final Set<String> VPN_DEPENDENT_RESTRICTIONS = setOf(
+            UserManager.DISALLOW_CONFIG_VPN
+    );
+
+    /**
      * Restrictions from {@link #USER_RESTRICTIONS} that a debug build leaves unset.
      *
      * <p>DISALLOW_DEBUGGING_FEATURES turns off USB debugging, and
@@ -211,9 +246,15 @@ public final class Policy {
     // Generate with:  python3 tools/hash-passcode.py
     // and paste the two values it prints here.
     //
-    // The default below is the passcode "changeme". Change it before you put
-    // this on a device: the APK is fetched over the network during QR
-    // provisioning, so treat anything compiled into it as readable.
+    // A checked-in placeholder hash means the maintenance screen cannot be
+    // unlocked at all, so a build that reaches a device has had real values
+    // pasted here. Which passcode they stand for is not recoverable from this
+    // file - keep it wherever you keep the signing key.
+    //
+    // These constants are not a secret store. The APK is fetched over the
+    // network during QR provisioning, so treat anything compiled into it as
+    // readable; the salt and iteration count are all that stand between the
+    // hash and an offline guess at the passcode. Pick one worth that.
 
     public static final String PASSCODE_SALT_B64 = "Y2hhbmdlbWUtc2FsdC0xMjM0";
     public static final String PASSCODE_HASH_B64 = "REPLACE_ME";
