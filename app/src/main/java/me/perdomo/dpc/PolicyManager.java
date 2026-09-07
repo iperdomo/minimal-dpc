@@ -744,6 +744,13 @@ public final class PolicyManager {
      * still set would leave a device with no network and no admin able to
      * turn it off, recoverable only by factory reset.</p>
      */
+    // clearDeviceOwnerApp() has been deprecated since API 26, which points
+    // callers at wipeData() instead so that a departing owner does not leave
+    // data behind on a device it no longer controls. That is the wrong trade
+    // here: this is the "Release device ownership" button, whose whole purpose
+    // is handing a device back WITHOUT a factory reset, and wipeData() would
+    // reset it. No non-wiping replacement exists, so the deprecated call stays.
+    @SuppressWarnings("deprecation")
     public static void releaseOwnership(Context ctx) {
         // Un-hide BEFORE clearing prefs. unhidePackages() reads the stored hide
         // list, so clearing first would leave every hidden app hidden for good:
