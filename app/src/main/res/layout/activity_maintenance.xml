@@ -84,6 +84,52 @@
                 android:layout_marginBottom="16dp"
                 android:background="#40808080" />
 
+            <!-- Organization -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="4dp"
+                android:textStyle="bold"
+                android:text="Organization" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="8dp"
+                android:textSize="12sp"
+                android:text="Fills in the lock screen: &quot;This device belongs to &lt;name&gt;&quot;, and &quot;managed by &lt;name&gt;&quot; in Settings. Leave it empty and the lock screen reads &quot;your organization&quot; instead - the notice itself cannot be turned off. One line, ellipsized at about 30 characters." />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingBottom="16dp">
+
+                <EditText
+                    android:id="@+id/organizationName"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="Acme Ltd"
+                    android:importantForAutofill="no"
+                    android:inputType="textCapWords|textNoSuggestions"
+                    android:maxLength="60"
+                    android:maxLines="1"
+                    android:textSize="14sp" />
+
+                <Button
+                    android:id="@+id/setOrganizationName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Set" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginBottom="16dp"
+                android:background="#40808080" />
+
             <!-- Approved apps -->
             <TextView
                 android:id="@+id/approvedHeader"

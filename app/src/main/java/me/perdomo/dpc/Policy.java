@@ -267,6 +267,82 @@ public final class Policy {
     public static final Set<String> DEBUG_SKIPPED_RESTRICTIONS = setOf();
 
     // ------------------------------------------------------------------
+    // Identification
+    // ------------------------------------------------------------------
+
+    /**
+     * Seed for the name of the organization the device belongs to.
+     *
+     * <p>This is what turns the lock screen's generic "This device belongs to
+     * your organization" into "This device belongs to Acme Ltd". SystemUI shows
+     * that line on any device with a Device Owner; the only thing a DPC
+     * controls is whether it can name you. With no name set the platform falls
+     * back to the generic wording - the message cannot be suppressed, and that
+     * is deliberate: it is the user's notice that the device is managed.</p>
+     *
+     * <p>Like {@link #APPROVED_PACKAGES} this is a seed, not the live value:
+     * the maintenance screen edits the name on the device, and once it has, the
+     * stored name is what gets applied. Editing here changes only what a
+     * freshly provisioned device starts with. Read the live value with
+     * {@link PolicyManager#organizationName(android.content.Context)}.</p>
+     *
+     * <p>Applied with setOrganizationName(). The same string is what Settings
+     * shows as "managed by ..." under Security and in the About screen.</p>
+     *
+     * <p>Keep it short. It is rendered on one line of the lock screen and is
+     * ellipsized, not wrapped; roughly thirty characters is the practical
+     * limit on a phone. {@link PolicyManager#MAX_ORGANIZATION_NAME} is the hard
+     * cap the maintenance screen enforces.</p>
+     *
+     * <p>Null - a device provisioned from a stock build shows the generic
+     * wording until someone types a name into the maintenance screen. Set it
+     * here instead if every device you build this APK for belongs to the same
+     * organization, which is the usual case.</p>
+     */
+    public static final String ORGANIZATION_NAME = null;
+
+    /**
+     * A second, free-form line of text on the lock screen.
+     *
+     * <p>Independent of {@link #ORGANIZATION_NAME}: that one only fills in the
+     * blank in a sentence the platform owns, while this is a line you write in
+     * full. The usual use is a return address - "If found, call +34 600 000
+     * 000". Applied with setDeviceOwnerLockScreenInfo(), which only a Device
+     * Owner may call.</p>
+     *
+     * <p>On most builds it takes the place of the owner info the user can set
+     * for themselves in Settings, and the user cannot edit or remove it.</p>
+     *
+     * <p>Set to null to leave it alone entirely - which, unlike the org name,
+     * means the device shows nothing extra. Set to "" to actively clear a
+     * string a previous build set.</p>
+     */
+    public static final String LOCK_SCREEN_INFO = null;
+
+    /**
+     * One-line explanation shown when the user hits something this policy
+     * blocks - the greyed-out VPN settings, for instance.
+     *
+     * <p>Applied with setShortSupportMessage(). Without it the system prints
+     * its own "Contact your IT admin for more information", which tells a user
+     * holding one of these devices nothing about who that is.</p>
+     *
+     * <p>Null or "" leaves the system default in place.</p>
+     */
+    public static final String SHORT_SUPPORT_MESSAGE = null;
+
+    /**
+     * Longer version of {@link #SHORT_SUPPORT_MESSAGE}, shown on the device
+     * administrator detail screen in Settings.
+     *
+     * <p>Applied with setLongSupportMessage(). This is the one place a user can
+     * go looking for an explanation of why the device behaves as it does, so it
+     * is worth a sentence or three: who runs the device, what is enforced, and
+     * how to reach a human.</p>
+     */
+    public static final String LONG_SUPPORT_MESSAGE = null;
+
+    // ------------------------------------------------------------------
     // Maintenance passcode
     // ------------------------------------------------------------------
     //

@@ -105,6 +105,30 @@ Two more are **given up** in `Policy.RELINQUISHED_RESTRICTIONS`, which is a diff
 
 To put either back, move the key into `USER_RESTRICTIONS` and take it out of `RELINQUISHED_RESTRICTIONS` — leaving it in both would clear it immediately after setting it.
 
+#### Naming the organization on the lock screen
+
+A locked Device Owner device always says **"This device belongs to your organization"** on the lock screen. That line is SystemUI's, not this app's, and it cannot be removed — it is the user's notice that the device is managed. What a DPC controls is whether the sentence can name you:
+
+```java
+public static final String ORGANIZATION_NAME = "Acme Ltd";   // seed; null: generic wording
+```
+
+`setOrganizationName()` is the whole mechanism. SystemUI reads back `getDeviceOwnerOrganizationName()` and picks one of two strings — `do_disclosure_generic` when it is empty, `do_disclosure_with_name` when it is not — so setting it turns the line into **"This device belongs to Acme Ltd"**. The same string is what Settings shows as *managed by …*.
+
+Like `APPROVED_PACKAGES`, this is a **seed, not the live value**. The maintenance screen has an *Organization* field that edits the name on the device, and once it has, the stored name is what gets applied — so a device can be renamed without a rebuild, and one APK can serve several organizations. `null` here means a freshly provisioned device shows the generic wording until someone types a name in. Set it if every device you build this APK for belongs to the same organization, which is the usual case.
+
+Setting the name takes effect immediately; there is no *Apply lockdown* step for it. Clearing the field and pressing **Set** goes back to the generic wording. Keep it short — the lock screen ellipsizes rather than wraps, so roughly thirty characters is the practical limit on a phone; the field itself caps at 60. The status block reads the name back from the platform, so it reports what the lock screen is actually showing rather than what `Policy.java` claims:
+
+```
+Lock screen    : "belongs to Acme Ltd" (edited on device)
+```
+
+Three related strings sit next to it in `Policy.java`. Unlike the name these stay compile-time only, so `null` means *leave it alone* and `""` means *clear a value an earlier build set*:
+
+- `LOCK_SCREEN_INFO` — a second, free-form line you write in full, typically a return address: *"If found, call +34 600 000 000"*. `setDeviceOwnerLockScreenInfo()`, Device Owner only; the user cannot edit or remove it.
+- `SHORT_SUPPORT_MESSAGE` — replaces the system's *"Contact your IT admin for more information"* when the user hits something the policy blocks, such as the greyed-out VPN settings.
+- `LONG_SUPPORT_MESSAGE` — the longer version, on the device administrator screen in Settings. This is the one place a user goes looking for an explanation, so it is worth a few sentences.
+
 ### 2. Set the maintenance passcode
 
 ```bash

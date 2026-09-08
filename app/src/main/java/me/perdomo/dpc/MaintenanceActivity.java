@@ -42,6 +42,7 @@ public class MaintenanceActivity extends Activity {
     private Button unlock;
     private Switch vpnAlwaysOn;
     private Switch vpnLockdown;
+    private EditText organizationName;
     private LinearLayout approvedList;
     private EditText newPackage;
     private TextView approvedHeader;
@@ -67,6 +68,7 @@ public class MaintenanceActivity extends Activity {
         unlock = findViewById(R.id.unlock);
         vpnAlwaysOn = findViewById(R.id.vpnAlwaysOn);
         vpnLockdown = findViewById(R.id.vpnLockdown);
+        organizationName = findViewById(R.id.organizationName);
         approvedList = findViewById(R.id.approvedList);
         newPackage = findViewById(R.id.newPackage);
         approvedHeader = findViewById(R.id.approvedHeader);
@@ -81,6 +83,7 @@ public class MaintenanceActivity extends Activity {
         findViewById(R.id.refresh).setOnClickListener(v -> refresh());
         findViewById(R.id.applyLockdown).setOnClickListener(v -> applyLockdown());
         findViewById(R.id.maintenanceMode).setOnClickListener(v -> beginMaintenance());
+        findViewById(R.id.setOrganizationName).setOnClickListener(v -> setOrganizationName());
         findViewById(R.id.addPackage).setOnClickListener(v -> addApproved());
         findViewById(R.id.addHidden).setOnClickListener(v -> addHidden());
         findViewById(R.id.releaseOwnership).setOnClickListener(v -> confirmRelease());
@@ -219,6 +222,30 @@ public class MaintenanceActivity extends Activity {
         if (problem != null) {
             toast("VPN NOT set: " + problem);
         }
+        refresh();
+    }
+
+    // ------------------------------------------------------------------
+    // Organization
+    // ------------------------------------------------------------------
+
+    /**
+     * Names the organization on the lock screen, or clears the name.
+     *
+     * <p>Takes effect the moment it is stored - there is no "apply lockdown"
+     * step for it - because the whole point is being able to read the result
+     * off the lock screen straight away.</p>
+     */
+    private void setOrganizationName() {
+        String name = organizationName.getText().toString().trim();
+        String problem = PolicyManager.setOrganizationName(this, name);
+        if (problem != null) {
+            toast(problem);
+            return;
+        }
+        toast(name.isEmpty()
+                ? "Cleared - the lock screen goes back to \"your organization\""
+                : "Lock screen now reads \"This device belongs to " + name + "\"");
         refresh();
     }
 
@@ -390,6 +417,12 @@ public class MaintenanceActivity extends Activity {
         vpnLockdown.setEnabled(alwaysOn && Policy.VPN_PACKAGE != null);
         vpnAlwaysOn.setEnabled(Policy.VPN_PACKAGE != null);
         syncingSwitches = false;
+
+        // Rewritten from the stored value on every refresh, so a half-typed
+        // name that was never submitted does not survive as if it had been.
+        // Nothing calls refresh() while the field has focus except the Set
+        // button itself, which has just stored what is in it.
+        organizationName.setText(PolicyManager.organizationName(this));
     }
 
     private void toast(String msg) {

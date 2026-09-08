@@ -39,6 +39,7 @@ public final class PolicyManager {
     private static final String KEY_VPN_LOCKDOWN = "vpn_lockdown";
     private static final String KEY_APPROVED = "approved_packages";
     private static final String KEY_HIDDEN = "hidden_packages";
+    private static final String KEY_ORG_NAME = "organization_name";
 
     /** Hiding this breaks maps, push, WebView updates and often the system UI. */
     private static final String PLAY_SERVICES = "com.google.android.gms";
@@ -67,6 +68,7 @@ public final class PolicyManager {
             return;
         }
         applyRestrictions(ctx);
+        applyIdentification(ctx);
         applyHiddenPackages(ctx);
         applyUninstallBlocked(ctx);
         applyVpn(ctx);
@@ -122,6 +124,153 @@ public final class PolicyManager {
                 // Best effort.
             }
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Identification
+    // ------------------------------------------------------------------
+
+    /**
+     * Names the organization on the lock screen and in Settings, and supplies
+     * the support text shown when the user hits a blocked action.
+     *
+     * <p>SystemUI puts "This device belongs to your organization" on the lock
+     * screen of every Device Owner device on its own. It swaps in
+     * "This device belongs to &lt;name&gt;" when
+     * getDeviceOwnerOrganizationName() returns something, which is exactly what
+     * setOrganizationName() below sets. There is no third state: the disclosure
+     * cannot be turned off, only made specific.</p>
+     *
+     * <p>Each call is wrapped separately. These are cosmetic - a device with an
+     * unnamed lock screen is still fully locked down - so a
+     * SecurityException on an OEM build that refuses one of them must not take
+     * the rest of {@link #applyAll} down with it.</p>
+     */
+    public static void applyIdentification(Context ctx) {
+        DevicePolicyManager dpm = dpm(ctx);
+        ComponentName admin = admin(ctx);
+
+        // Unconditional, unlike the three below: the name is stored on the
+        // device, so an empty value is a decision the operator made on the
+        // maintenance screen and has to reach the platform as null - which is
+        // how these setters mean "clear". The others are still compile-time
+        // constants, where null means "leave whatever is there alone".
+        try {
+            dpm.setOrganizationName(admin, emptyToNull(organizationName(ctx)));
+        } catch (Exception e) {
+            Log.w(TAG, "Could not set organization name", e);
+        }
+        if (Policy.LOCK_SCREEN_INFO != null) {
+            try {
+                dpm.setDeviceOwnerLockScreenInfo(admin, emptyToNull(Policy.LOCK_SCREEN_INFO));
+            } catch (Exception e) {
+                Log.w(TAG, "Could not set lock screen info", e);
+            }
+        }
+        if (Policy.SHORT_SUPPORT_MESSAGE != null) {
+            try {
+                dpm.setShortSupportMessage(admin, emptyToNull(Policy.SHORT_SUPPORT_MESSAGE));
+            } catch (Exception e) {
+                Log.w(TAG, "Could not set short support message", e);
+            }
+        }
+        if (Policy.LONG_SUPPORT_MESSAGE != null) {
+            try {
+                dpm.setLongSupportMessage(admin, emptyToNull(Policy.LONG_SUPPORT_MESSAGE));
+            } catch (Exception e) {
+                Log.w(TAG, "Could not set long support message", e);
+            }
+        }
+    }
+
+    /**
+     * Longest organization name the maintenance screen will accept.
+     *
+     * <p>Well past what the lock screen can show - it ellipsizes at roughly
+     * thirty characters on a phone - so this is a guard against a paste
+     * accident, not a layout constraint. A name that is merely too long to fit
+     * is the operator's call to make.</p>
+     */
+    public static final int MAX_ORGANIZATION_NAME = 60;
+
+    /**
+     * The organization name the lock screen should use.
+     *
+     * <p>Stored on the device rather than compiled in, so the maintenance
+     * screen can change it without a rebuild. {@link Policy#ORGANIZATION_NAME}
+     * is only the value a freshly provisioned device starts with.</p>
+     *
+     * <p>Never null: "" is the "no name set" value, and means the lock screen
+     * falls back to "This device belongs to your organization".</p>
+     */
+    public static String organizationName(Context ctx) {
+        String seed = Policy.ORGANIZATION_NAME == null ? "" : Policy.ORGANIZATION_NAME.trim();
+        return prefs(ctx).getString(KEY_ORG_NAME, seed);
+    }
+
+    /** True once the name has been set on the device, whatever it was set to. */
+    public static boolean hasCustomOrganizationName(Context ctx) {
+        return prefs(ctx).contains(KEY_ORG_NAME);
+    }
+
+    /**
+     * Sets the organization name from the maintenance screen.
+     *
+     * <p>Pass "" to clear it and go back to the generic wording. Returns a
+     * message to show the operator, or null on success.</p>
+     */
+    public static String setOrganizationName(Context ctx, String name) {
+        if (!isDeviceOwner(ctx)) {
+            return "Not device owner - cannot set the organization name";
+        }
+        String clean = name == null ? "" : name.trim();
+        if (clean.length() > MAX_ORGANIZATION_NAME) {
+            return "Too long - " + MAX_ORGANIZATION_NAME + " characters at most";
+        }
+        // The lock screen is one line. A newline would either be swallowed or
+        // truncate the name at the break, depending on the build.
+        if (clean.indexOf('\n') >= 0 || clean.indexOf('\r') >= 0) {
+            return "One line only - no line breaks";
+        }
+        prefs(ctx).edit().putString(KEY_ORG_NAME, clean).apply();
+        applyIdentification(ctx);
+        return null;
+    }
+
+    /**
+     * Clears everything {@link #applyIdentification} set.
+     *
+     * <p>Unconditional, unlike the apply side: releasing ownership has to leave
+     * the device clean whatever Policy.java currently says, including a name
+     * set by an older build.</p>
+     */
+    private static void releaseIdentification(Context ctx) {
+        DevicePolicyManager dpm = dpm(ctx);
+        ComponentName admin = admin(ctx);
+        try {
+            dpm.setOrganizationName(admin, null);
+        } catch (Exception ignored) {
+            // Best effort.
+        }
+        try {
+            dpm.setDeviceOwnerLockScreenInfo(admin, null);
+        } catch (Exception ignored) {
+            // Best effort.
+        }
+        try {
+            dpm.setShortSupportMessage(admin, null);
+        } catch (Exception ignored) {
+            // Best effort.
+        }
+        try {
+            dpm.setLongSupportMessage(admin, null);
+        } catch (Exception ignored) {
+            // Best effort.
+        }
+    }
+
+    private static CharSequence emptyToNull(String s) {
+        return s.isEmpty() ? null : s;
     }
 
     // ------------------------------------------------------------------
@@ -801,6 +950,7 @@ public final class PolicyManager {
         prefs(ctx).edit().clear().apply();
         clearVpn(ctx);
         releaseRestrictions(ctx);
+        releaseIdentification(ctx);
         releaseUninstallBlocked(ctx);
         WatchdogService.stop(ctx);
 
@@ -939,6 +1089,25 @@ public final class PolicyManager {
                       : "permitted (turn on in Developer options)")
               .append('\n');
         }
+
+        // Read back rather than echoed from Policy.java: this is the string the
+        // lock screen is actually filling into "This device belongs to ...".
+        String org = null;
+        try {
+            CharSequence cs = dpm.getOrganizationName(admin);
+            org = cs == null ? null : cs.toString();
+        } catch (Exception ignored) {
+            // Reported as the generic wording below.
+        }
+        sb.append("Lock screen    : ");
+        if (org == null || org.isEmpty()) {
+            sb.append("\"belongs to your organization\" (no name set)");
+        } else {
+            sb.append('"').append("belongs to ").append(org).append('"')
+              .append(hasCustomOrganizationName(ctx)
+                      ? " (edited on device)" : " (from Policy.java)");
+        }
+        sb.append('\n');
 
         sb.append("Install watch  : ");
         if (!Policy.RUN_INSTALL_WATCHDOG) {
