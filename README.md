@@ -401,7 +401,3 @@ The on-device controls are covered too, driven through the real UI rather than b
 - **Release of ownership** — the ordering contract above, verified by releasing a device with ten stock apps hidden and confirming all ten came back.
 
 Both lists were exercised with 30 entries each to check the screen still scrolls and stays usable.
-
-Untested: real OEM hardware, a real VPN tunnel under lockdown, and the Play Store install path with a signed-in account. Treat the first device as a test device.
-
-Also untested: the maintenance screen against a full on-screen keyboard. `windowSoftInputMode="adjustResize"` is set so the form scrolls clear of the IME, but the emulator used here has a hardware keyboard attached and only ever showed a floating one. Worth ten seconds on the first real device: tap either *Add* field and check you can still see what you are typing.
