@@ -24,3 +24,6 @@ __pycache__/
 
 # OS
 .DS_Store
+
+# Local, machine-specific instructions
+CLAUDE.local.md

@@ -5,7 +5,7 @@ A single-purpose Android Device Owner app for a handful of devices you can hold 
 It does three things:
 
 1. **Always-on VPN with lockdown** — pins a VPN client as always-on and blocks every packet that is not inside the tunnel.
-2. **Approved packages only** — the Play Store stays fully usable, but any non-system app installed from it that is not on your allowlist is hidden and uninstalled within seconds.
+2. **Approved packages only** — the Play Store stays fully usable, and so does any other installer (F-Droid, a hand-installed APK), but any non-system app that arrives and is not on your allowlist is hidden and uninstalled within seconds, whatever installed it.
 3. **Hidden pre-installed apps** — stock software is exempt from the allowlist by definition, so anything you do not want (YouTube, Gmail, the vendor browser) is named separately and hidden.
 
 No server. No database. No admin console. No cloud account, quota request, or per-device fee. The policy ships compiled into the APK; the two things you change most — the approved-app list and the VPN switches — are then editable on the device itself, behind a passcode.
@@ -26,7 +26,7 @@ A genuinely *filtered* Play Store — where the store shows only your approved t
 
 The practical consequences:
 
-- The user browses the full Play catalogue and can start any install.
+- The user browses the full Play catalogue — or any F-Droid repository, or any APK they can get onto the device — and can start any install.
 - An unapproved app is hidden and uninstalled almost immediately, but there is a window in which its code has run at least once.
 - The user sees the app appear and then vanish, which is confusing unless you tell them why.
 
@@ -96,7 +96,14 @@ It only needs your **non-system** apps. System apps are never touched — hiding
 
 Never put `com.google.android.gms` in `HIDDEN_PACKAGES`. Hiding Play Services breaks maps, push, WebView updates and frequently the system UI.
 
-Two restrictions are deliberately **absent** from the defaults because they would break a working Play Store, and `Policy.java` documents why: `DISALLOW_INSTALL_APPS` (blocks every install, Play included) and `DISALLOW_UNINSTALL_APPS` (would also stop this app removing unapproved software — `UNINSTALL_BLOCKED` does that job precisely instead). `DISALLOW_INSTALL_UNKNOWN_SOURCES` stays, and is doing real work: it leaves Play as the only channel software can arrive through, which is the one channel this app watches.
+Two restrictions are deliberately **absent** from the defaults because they would break a working Play Store, and `Policy.java` documents why: `DISALLOW_INSTALL_APPS` (blocks every install, Play included) and `DISALLOW_UNINSTALL_APPS` (would also stop this app removing unapproved software — `UNINSTALL_BLOCKED` does that job precisely instead).
+
+Two more are **given up** in `Policy.RELINQUISHED_RESTRICTIONS`, which is a different thing: those keys are passed to `clearUserRestriction()` on every apply, so a device provisioned back when they were still enforced actually has them taken off. Dropping a key from `USER_RESTRICTIONS` alone would not do that — an absent key is never cleared either, and the restriction would stay set for the life of the device.
+
+- `DISALLOW_INSTALL_UNKNOWN_SOURCES` — given up so software can come from somewhere other than Play. It blocked the per-app *install unknown apps* toggle that F-Droid, or any other installer, needs. The allowlist is unaffected: enforcement watches for a package appearing, not for the store it came from. What changes is the shape of the guarantee — Play is no longer a chokepoint, and the allowlist sweep is the only thing between the user and an arbitrary APK.
+- `DISALLOW_DEBUGGING_FEATURES` — given up so USB debugging can be turned on from Developer options. Clearing it only *permits* debugging; adbd does not come back on its own, so it still has to be switched on by hand.
+
+To put either back, move the key into `USER_RESTRICTIONS` and take it out of `RELINQUISHED_RESTRICTIONS` — leaving it in both would clear it immediately after setting it.
 
 ### 2. Set the maintenance passcode
 
@@ -193,10 +200,11 @@ VPN switches   : always-on ON, lockdown ON
 Always-on VPN  : com.wireguard.android
 VPN lockdown   : on
 VPN installed  : yes
-Restrictions   : 6 / 6
-Sideloading    : blocked
+Restrictions   : 4 / 4
+Sideloading    : allowed by policy (allowlist still enforced)
+USB debugging  : permitted (turn on in Developer options)
 Install watch  : running
-Approved apps  : 2 (from Policy.java)
+Approved apps  : 3 (from Policy.java)
 Hidden apps    : 0 (from Policy.java)
 Unapproved now : 0
 ```
@@ -294,9 +302,10 @@ After release, `Policy.java` is the only policy that exists again — both lists
 
 Three layers:
 
-1. **`DISALLOW_INSTALL_UNKNOWN_SOURCES`** narrows the problem. Sideloading is blocked, so Play is the only way software arrives — one channel to watch instead of many.
-2. **`WatchdogService` + `PackageMonitorReceiver`** is the fast path, reacting to a new install within about a second.
-3. **`EnforcementJobService`** is the backstop: a full reconciliation every 15 minutes that also restarts the watchdog if its process was killed.
+1. **`WatchdogService` + `PackageMonitorReceiver`** is the fast path, reacting to a new install within about a second. It listens for the package appearing, so Play, F-Droid and `adb install` all go through it alike.
+2. **`EnforcementJobService`** is the backstop: a full reconciliation every 15 minutes that also restarts the watchdog if its process was killed.
+
+There used to be a third layer in front of these: `DISALLOW_INSTALL_UNKNOWN_SOURCES` narrowed the problem to a single channel by making Play the only way software could arrive. It is now relinquished (see above), so both remaining layers carry the whole load. Nothing about them changes — they never inspected the installer — but a sideloaded app is unapproved for a second or two rather than never installing at all.
 
 The watchdog exists for a specific reason worth knowing before you try to delete it. `ACTION_PACKAGE_ADDED` is **not** on Android's [implicit broadcast exception list](https://developer.android.com/develop/background-work/background-tasks/broadcasts/broadcast-exceptions), so a manifest-declared receiver for it is silently never delivered to an app targeting API 26 or higher. Runtime registration still works, but only while a process is alive to hold it — hence a foreground service, and hence the permanent low-priority notification.
 
@@ -319,20 +328,20 @@ Build and install the debug variant, not the release one:
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-`AdminReceiver.onEnabled` applies the whole policy the instant ownership is set, and `DISALLOW_DEBUGGING_FEATURES` turns off USB debugging — so a release build drops your adb link one step after `dpm set-device-owner`, before you can install anything, read a log or press a button. This is measured, not theoretical:
+`DISALLOW_DEBUGGING_FEATURES` is now relinquished, so this no longer bites — but it is worth knowing why the debug variant exists, and it comes straight back if you ever put the restriction into `USER_RESTRICTIONS` again. `AdminReceiver.onEnabled` applies the whole policy the instant ownership is set, and that restriction turns off USB debugging — so a release build would drop your adb link one step after `dpm set-device-owner`, before you could install anything, read a log or press a button. This is measured, not theoretical:
 
 ```
 19:10:00.815 DevicePolicyManager: Changing user restriction no_debugging_features on user 0 to: true
 19:10:00.930 AdbService:          setAdbEnabled(false), mIsAdbUsbEnabled=true
 ```
 
-115 ms from the restriction landing to `adbd` being shut down, and `adb devices` reads `offline` from then on. Worse, undoing it is not symmetrical: clearing the restriction only *permits* debugging again, and adbd does not restart by itself — USB debugging has to be switched back on by hand in Developer options. If you cannot reach the device screen, the only way out is a factory reset. The debug variant clears the restrictions named in `Policy.DEBUG_SKIPPED_RESTRICTIONS` instead of applying them. Its status panel says so at the top, and reports the skipped count rather than pretending the set is short:
+115 ms from the restriction landing to `adbd` being shut down, and `adb devices` reads `offline` from then on. Worse, undoing it is not symmetrical: clearing the restriction only *permits* debugging again, and adbd does not restart by itself — USB debugging has to be switched back on by hand in Developer options. If you cannot reach the device screen, the only way out is a factory reset. The debug variant clears the restrictions named in `Policy.DEBUG_SKIPPED_RESTRICTIONS` instead of applying them; that set is empty today, because the one entry it held is now given up on every build. Its status panel still says which variant you are running, and reports the skipped count rather than pretending the set is short:
 
 ```
 *** DEBUG BUILD - adb left enabled, do not deploy ***
 
 Device owner   : yes
-Restrictions   : 5 / 5   (1 skipped: debug build)
+Restrictions   : 4 / 4
 ```
 
 An AVD that has finished setup refuses `dpm set-device-owner`, so clear the setup flags around it:

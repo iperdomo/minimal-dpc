@@ -90,9 +90,12 @@ public final class Policy {
     /**
      * Seed for the list of non-system apps permitted on the device.
      *
-     * <p>The Play Store stays fully usable. Anything installed from it that is
-     * not on the allowlist gets hidden and then uninstalled, normally within a
-     * couple of seconds - see the note on enforcement latency in the README.</p>
+     * <p>The Play Store stays fully usable, and so does any other installer -
+     * F-Droid, or a hand-installed APK. Anything that arrives and is not on the
+     * allowlist gets hidden and then uninstalled, normally within a couple of
+     * seconds, whatever installed it: enforcement watches for the package
+     * appearing, not for the store it came from. See the note on enforcement
+     * latency in the README.</p>
      *
      * <p>This is a starting point, not the live list: the maintenance screen
      * adds and removes packages by hand, and once it has, the stored list is
@@ -108,7 +111,12 @@ public final class Policy {
      */
     public static final Set<String> APPROVED_PACKAGES = setOf(
             "com.wireguard.android",
-            "org.mozilla.firefox"
+            "org.mozilla.firefox",
+            // The installer has to be on the list like anything else, or it is
+            // uninstalled seconds after it lands. "org.fdroid.basic" is the
+            // stripped-down build, a separate package id - add it too if that
+            // is the one you use.
+            "org.fdroid.fdroid"
     );
 
     /**
@@ -176,18 +184,48 @@ public final class Policy {
      *       Add it back if you want to pin the account once it is set up.</li>
      * </ul>
      *
-     * <p>DISALLOW_INSTALL_UNKNOWN_SOURCES stays, and is doing real work: it
-     * leaves Play as the only way software can arrive, which is the one
-     * channel this app watches.</p>
+     * <p>DISALLOW_INSTALL_UNKNOWN_SOURCES and DISALLOW_DEBUGGING_FEATURES are
+     * absent too, but by a later decision rather than by design - see
+     * {@link #RELINQUISHED_RESTRICTIONS}.</p>
      */
     public static final String[] USER_RESTRICTIONS = {
-            UserManager.DISALLOW_INSTALL_UNKNOWN_SOURCES,
-            UserManager.DISALLOW_DEBUGGING_FEATURES,
             UserManager.DISALLOW_CONFIG_VPN,
             UserManager.DISALLOW_CONFIG_TETHERING,
             UserManager.DISALLOW_SAFE_BOOT,
             UserManager.DISALLOW_ADD_USER,
     };
+
+    /**
+     * Restrictions this policy actively gives up: cleared on every apply.
+     *
+     * <p>Not the same thing as leaving a key out of {@link #USER_RESTRICTIONS}.
+     * A key that is simply absent is never passed to clearUserRestriction()
+     * either, so on a device that was provisioned while it was still listed
+     * the restriction stays set for the life of the device. Naming it here is
+     * what actually takes it back off.</p>
+     *
+     * <p>DISALLOW_INSTALL_UNKNOWN_SOURCES: dropped so software can arrive from
+     * somewhere other than Play - F-Droid, or a hand-installed APK. It blocked
+     * the per-app "install unknown apps" toggle that any such installer needs.
+     * The allowlist is unaffected: enforcement watches ACTION_PACKAGE_ADDED,
+     * which does not care where a package came from, so an unapproved app
+     * sideloaded from F-Droid is hidden and uninstalled exactly as one from
+     * Play is. What changes is the shape of the guarantee - Play is no longer
+     * a chokepoint, and the allowlist sweep is the only thing standing between
+     * the user and an arbitrary APK.</p>
+     *
+     * <p>DISALLOW_DEBUGGING_FEATURES: dropped so USB debugging can be turned on
+     * from Developer options. Clearing the restriction only permits it; adbd
+     * does not come back on its own, so it has to be switched on by hand.</p>
+     *
+     * <p>Applies to release builds too - that is the point. To put either
+     * restriction back, move the key to {@link #USER_RESTRICTIONS} and take it
+     * out of here; leaving it in both would clear it right after setting it.</p>
+     */
+    public static final Set<String> RELINQUISHED_RESTRICTIONS = setOf(
+            UserManager.DISALLOW_INSTALL_UNKNOWN_SOURCES,
+            UserManager.DISALLOW_DEBUGGING_FEATURES
+    );
 
     /**
      * Restrictions from {@link #USER_RESTRICTIONS} that stay unset until
@@ -212,32 +250,21 @@ public final class Policy {
     /**
      * Restrictions from {@link #USER_RESTRICTIONS} that a debug build leaves unset.
      *
-     * <p>DISALLOW_DEBUGGING_FEATURES turns off USB debugging, and
-     * AdminReceiver.onEnabled applies the whole policy the instant ownership is
-     * set - so on a release build the adb link is gone one step after
-     * {@code dpm set-device-owner}, before you can install anything, read a log
-     * or press a button. That is correct on a deployed device and useless on a
-     * test one.</p>
+     * <p>Empty, because the one entry that used to be here -
+     * DISALLOW_DEBUGGING_FEATURES - is now given up on every build, debug and
+     * release alike, via {@link #RELINQUISHED_RESTRICTIONS}. The mechanism
+     * stays: it is the right place for any future restriction that would cut
+     * the adb link the moment AdminReceiver.onEnabled applies the policy, which
+     * on a test device is one step after {@code dpm set-device-owner}.</p>
      *
-     * <p>A debug build does not merely skip these: it clears them, so a debug
-     * APK installed over a release one hands adb back on the next apply rather
-     * than leaving it severed.</p>
-     *
-     * <p>That is not a rescue for a device whose release build has already cut
-     * the link - installing anything needs the adb that is gone. Recovery is
-     * on the device itself: maintenance screen, passcode, "Suspend lockdown"
-     * or "Release device ownership". Note that clearing the restriction only
-     * permits debugging again; observed behaviour is that adbd does not come
-     * back on its own, so USB debugging has to be switched on again by hand in
-     * Developer options. If the screen is unreachable, a factory reset is the
-     * only way out.</p>
+     * <p>A debug build does not merely skip what is named here: it clears it,
+     * so a debug APK installed over a release one hands the capability back on
+     * the next apply rather than leaving it severed.</p>
      *
      * <p>Ignored entirely by release builds, so nothing here can weaken a
      * device you actually deploy.</p>
      */
-    public static final Set<String> DEBUG_SKIPPED_RESTRICTIONS = setOf(
-            UserManager.DISALLOW_DEBUGGING_FEATURES
-    );
+    public static final Set<String> DEBUG_SKIPPED_RESTRICTIONS = setOf();
 
     // ------------------------------------------------------------------
     // Maintenance passcode

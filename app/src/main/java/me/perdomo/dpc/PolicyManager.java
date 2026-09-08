@@ -275,6 +275,29 @@ public final class PolicyManager {
                 Log.w(TAG, "Restriction " + r + " skipped: " + e.getMessage());
             }
         }
+        clearRelinquished(ctx);
+    }
+
+    /**
+     * Clears the restrictions this policy has given up, on every apply.
+     *
+     * <p>Separate from the loop above because dropping a key out of
+     * {@link Policy#USER_RESTRICTIONS} is not the same as taking the
+     * restriction off the device: a key that is not in the array is never
+     * passed to clearUserRestriction() either, so a device provisioned while it
+     * was still listed would keep it forever. See
+     * {@link Policy#RELINQUISHED_RESTRICTIONS}.</p>
+     */
+    private static void clearRelinquished(Context ctx) {
+        DevicePolicyManager dpm = dpm(ctx);
+        ComponentName admin = admin(ctx);
+        for (String r : Policy.RELINQUISHED_RESTRICTIONS) {
+            try {
+                dpm.clearUserRestriction(admin, r);
+            } catch (Exception e) {
+                Log.w(TAG, "Restriction " + r + " not cleared: " + e.getMessage());
+            }
+        }
     }
 
     /**
@@ -889,11 +912,33 @@ public final class PolicyManager {
         }
         sb.append('\n');
 
-        sb.append("Sideloading    : ")
-          .append(um != null && um.hasUserRestriction(
-                  android.os.UserManager.DISALLOW_INSTALL_UNKNOWN_SOURCES)
-                  ? "blocked" : "ALLOWED")
-          .append('\n');
+        // Reported against what the policy asks for, not against a fixed idea
+        // of "locked down": with the restriction relinquished, "allowed" is the
+        // correct state and shouting ALLOWED at every apply would be noise.
+        boolean sideloadBlocked = um != null && um.hasUserRestriction(
+                android.os.UserManager.DISALLOW_INSTALL_UNKNOWN_SOURCES);
+        boolean sideloadRelinquished = Policy.RELINQUISHED_RESTRICTIONS.contains(
+                android.os.UserManager.DISALLOW_INSTALL_UNKNOWN_SOURCES);
+        sb.append("Sideloading    : ");
+        if (sideloadRelinquished) {
+            sb.append(sideloadBlocked
+                    ? "STILL BLOCKED (apply lockdown to clear)"
+                    : "allowed by policy (allowlist still enforced)");
+        } else {
+            sb.append(sideloadBlocked ? "blocked" : "ALLOWED");
+        }
+        sb.append('\n');
+
+        boolean debugRelinquished = Policy.RELINQUISHED_RESTRICTIONS.contains(
+                android.os.UserManager.DISALLOW_DEBUGGING_FEATURES);
+        if (debugRelinquished) {
+            sb.append("USB debugging  : ")
+              .append(um != null && um.hasUserRestriction(
+                      android.os.UserManager.DISALLOW_DEBUGGING_FEATURES)
+                      ? "STILL BLOCKED (apply lockdown to clear)"
+                      : "permitted (turn on in Developer options)")
+              .append('\n');
+        }
 
         sb.append("Install watch  : ");
         if (!Policy.RUN_INSTALL_WATCHDOG) {
