@@ -1090,17 +1090,18 @@ public final class PolicyManager {
               .append('\n');
         }
 
-        // Read back rather than echoed from Policy.java: this is the string the
-        // lock screen is actually filling into "This device belongs to ...".
-        String org = null;
-        try {
-            CharSequence cs = dpm.getOrganizationName(admin);
-            org = cs == null ? null : cs.toString();
-        } catch (Exception ignored) {
-            // Reported as the generic wording below.
-        }
+        // The stored value, not a read-back: getOrganizationName() looks like the
+        // honest way to ask the platform, but DevicePolicyManagerService gates it
+        // on the caller being inside a managed profile, so on a fully managed
+        // device it throws whatever the name is - which read as "no name set"
+        // here while the lock screen was showing the name perfectly well. The
+        // device-owner read, getDeviceOwnerOrganizationName(), is a @SystemApi.
+        // This is the same string applyIdentification() pushes, so it is what the
+        // lock screen is filling into "This device belongs to ..." unless that
+        // setter failed, which it logs.
+        String org = organizationName(ctx);
         sb.append("Lock screen    : ");
-        if (org == null || org.isEmpty()) {
+        if (org.isEmpty()) {
             sb.append("\"belongs to your organization\" (no name set)");
         } else {
             sb.append('"').append("belongs to ").append(org).append('"')
