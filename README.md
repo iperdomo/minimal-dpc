@@ -117,7 +117,7 @@ public static final String ORGANIZATION_NAME = "Acme Ltd";   // seed; null: gene
 
 Like `APPROVED_PACKAGES`, this is a **seed, not the live value**. The maintenance screen has an *Organization* field that edits the name on the device, and once it has, the stored name is what gets applied — so a device can be renamed without a rebuild, and one APK can serve several organizations. `null` here means a freshly provisioned device shows the generic wording until someone types a name in. Set it if every device you build this APK for belongs to the same organization, which is the usual case.
 
-Setting the name takes effect immediately; there is no *Apply lockdown* step for it. Clearing the field and pressing **Set** goes back to the generic wording. Keep it short — the lock screen ellipsizes rather than wraps, so roughly thirty characters is the practical limit on a phone; the field itself caps at 60. The status block reads the name back from the platform, so it reports what the lock screen is actually showing rather than what `Policy.java` claims:
+Setting the name takes effect immediately; there is no *Apply lockdown* step for it. Clearing the field and pressing **Set** goes back to the generic wording. Keep it short — the lock screen ellipsizes rather than wraps, so roughly thirty characters is the practical limit on a phone; the field itself caps at 60. The status block shows the stored name, which is the string the app pushes with `setOrganizationName()` and therefore what the lock screen is filling in. It is deliberately not a read-back: `getOrganizationName()` is refused outside a managed profile, so on a fully managed device it throws no matter what the name is, and `getDeviceOwnerOrganizationName()` — the Device Owner read SystemUI itself uses — is a `@SystemApi` a normal APK cannot call. The suffix says where the name came from:
 
 ```
 Lock screen    : "belongs to Acme Ltd" (edited on device)
@@ -227,6 +227,7 @@ VPN installed  : yes
 Restrictions   : 4 / 4
 Sideloading    : allowed by policy (allowlist still enforced)
 USB debugging  : permitted (turn on in Developer options)
+Lock screen    : "belongs to Acme Ltd" (from Policy.java)
 Install watch  : running
 Approved apps  : 3 (from Policy.java)
 Hidden apps    : 0 (from Policy.java)
